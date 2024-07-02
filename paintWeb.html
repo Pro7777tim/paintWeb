@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Canvas</title>
+    <style>
+        #brush, #palette, #eraser, #strokes, #ruler, #paint-bucket, #drafting-compass, #square-ruler, #save, #import {
+            position: absolute;
+            background-color: Aqua;
+            width: 2%;
+            height: 4%;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <script src="https://code.jquery.com/jquery-2.1.0.js"></script>
+    <canvas id="canvas" width="1920" height="1080"></canvas>
+    <button id="brush" title="Пензлик"><img src="img/brush.png" style="width: 100%; height: 100%;"></button>
+    <button id="palette" title="Палітра"><img src="img/palette.png" style="width: 100%; height: 100%;"></button>
+    <button id="eraser" title="Гумка"><img src="img/eraser.png" style="width: 100%; height: 100%;"></button>
+    <button id="strokes" title="Штрихи"><img src="img/stroke.png" style="width: 100%; height: 100%;"></button>
+    <button id="ruler" title="Лінійка"><img src="img/ruler.png" style="width: 100%; height: 100%;"></button>
+    <button id="paint-bucket" title="Заливка"><img src="img/paint-bucket.png" style="width: 100%; height: 100%;"></button>
+    <button id="drafting-compass" title="Циркуль"><img src="img/drafting-compass.png" style="width: 100%; height: 100%;"></button>
+    <button id="square-ruler" title="Квадратна лінійка"><img src="img/square-ruler.png" style="width: 100%; height: 100%;"></button>
+    <button id="save" title="Збереження" download><img src="img/save.png" style="width: 100%; height: 100%;"></button>
+    <button id="import" title="Додати зображення" download><img src="img/import.png" style="width: 100%; height: 100%;"></button>
+    <script>
+        var canvas = document.getElementById("canvas");
+        var ctx = canvas.getContext("2d");
+        var color = null;
+        var strokes = 3;
+        var widthEraser = 75;
+        var draw = false;
+        var widthCircle = null;
+        var widthSquare = null;
+        var heightSquare = null;
+        var widthImg = null;
+        var heightImg = null;
+        var xCircle = null;
+        var yCircle = null;
+        var xSquare = null;
+        var ySquare = null;
+        var xImg = null;
+        var yImg = null;
+        var srcImg = null;
+
+        var saveButton = $("#save");
+        saveButton.on("click", function () {
+            var pngDataUrl = canvas.toDataURL();
+            var a = document.createElement("a");
+            document.body.appendChild(a);
+            a.href = pngDataUrl;
+            a.download = "canvas.png";
+            a.click();
+            document.body.removeChild(a);
+        });
+
+        var stopScroll = function () {
+            document.body.style.cssText = 'overflow: hidden;';
+        }
+        stopScroll();
+
+        $("#palette").css("background-color", "Black");
+        $("#palette").css({ left: 10, top: 250 });
+        $("#strokes").css({ left: 10, top: 290 });
+        $("#paint-bucket").css({ left: 10, top: 210 });
+        $("#save").css({ left: 10, top: 370 });
+
+        var Tool = function (x, y, id) {
+            this.x = x;
+            this.y = y;
+            this.id = id;
+            this.isSelected = false;
+            $("#" + this.id).css({ left: this.x, top: this.y });
+        }
+
+        ctx.lineWidth = strokes;
+
+        var paintingWithABrush = function (event) {
+            ctx.lineTo(event.pageX, event.pageY);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(event.pageX, event.pageY);
+        }
+
+        var erasureWithAEraser = function (event) {
+            ctx.clearRect(event.pageX, event.pageY, widthEraser, widthEraser);
+        }
+
+        Tool.prototype.checkIsSelected = function (tools) {
+            var tool = this;
+            $("#" + this.id).click(function () {
+                tools.forEach(t => {
+                    if (t.id !== tool.id) {
+                        t.isSelected = false;
+                        $("#" + t.id).css("background-color", "Aqua");
+                    }
+                });
+                tool.isSelected = !tool.isSelected;
+                if (tool.isSelected) {
+                    $("#" + tool.id).css("background-color", "Green");
+                    if (tool.id === "brush") {
+                        canvas.style.cursor = "url('img/brush.png'), pointer";
+                    } else if (tool.id === "eraser") {
+                        canvas.style.cursor = "url('img/eraser.png'), pointer";
+                    } else if (tool.id === "import") {
+                        canvas.style.cursor = "url('img/import.png'), pointer";
+                    }
+                    else if (tool.id === "ruler") {
+                        canvas.style.cursor = "url('img/ruler.png'), pointer";
+                    }
+                    else if (tool.id === "drafting-compass") {
+                        canvas.style.cursor = "url('img/drafting-compass.png'), pointer";
+                    }
+                    else if (tool.id === "square-ruler") {
+                        canvas.style.cursor = "url('img/square-ruler.png'), pointer";
+                    }
+                } else {
+                    $("#" + tool.id).css("background-color", "Aqua");
+                    canvas.style.cursor = "auto";
+                }
+            });
+        };
+
+        var brush = new Tool(10, 10, "brush");
+        var eraser = new Tool(10, 50, "eraser");
+        var ruler = new Tool(10, 90, "ruler");
+        var draftingCompass = new Tool(10, 130, "drafting-compass");
+        var squareRuler = new Tool(10, 170, "square-ruler");
+        var importImg = new Tool(10, 330, "import");
+        var tools = [brush, eraser, ruler, draftingCompass, squareRuler, importImg];
+
+        tools.forEach(tool => tool.checkIsSelected(tools));
+
+        $("#canvas").mousedown(function (event) {
+            draw = true;
+            ctx.beginPath();
+            if (draftingCompass.isSelected) {
+                xCircle = event.pageX;
+                yCircle = event.pageY;
+            } else if (squareRuler.isSelected) {
+                xSquare = event.pageX;
+                ySquare = event.pageY;
+            } else if (importImg.isSelected) {
+                xImg = event.pageX;
+                yImg = event.pageY;
+            } else if (ruler.isSelected) {
+                ctx.moveTo(event.pageX, event.pageY);
+            } else if (brush.isSelected) {
+                ctx.moveTo(event.pageX, event.pageY);
+            }
+        }).mouseup(function (event) {
+            draw = false;
+            if (draftingCompass.isSelected) {
+                widthCircle = event.pageX - xCircle;
+                ctx.arc(xCircle, yCircle, widthCircle, 0, Math.PI * 2, false);
+                ctx.stroke();
+                ctx.closePath();
+            } else if (squareRuler.isSelected) {
+                widthSquare = event.pageX - xSquare;
+                heightSquare = event.pageY - ySquare;
+                ctx.strokeRect(xSquare, ySquare, widthSquare, heightSquare);
+                ctx.rect(xSquare, ySquare, widthSquare, heightSquare);
+                ctx.closePath();
+            } else if (importImg.isSelected) {
+    widthImg = event.pageX - xImg;
+    heightImg = event.pageY - yImg;
+    srcImg = "folder_for_import_images/" + prompt("Введіть назву картинки");
+
+    if (srcImg) {
+        var img = new Image();
+        img.src = srcImg;
+
+        img.onload = function() {
+            ctx.drawImage(img, xImg, yImg, widthImg, heightImg);
+        };
+
+        img.onerror = function(event) {
+            console.error("Image failed to load: " + srcImg);
+            console.error("Error details:", event);
+            alert("Не вдалося завантажити зображення: " + srcImg);
+        };
+    }
+}
+ else if (ruler.isSelected) {
+                ctx.lineTo(event.pageX, event.pageY);
+                ctx.stroke();
+                ctx.closePath();
+            }
+        }).mousemove(function (event) {
+            if (draw) {
+                if (brush.isSelected) {
+                    paintingWithABrush(event);
+                } else if (eraser.isSelected) {
+                    erasureWithAEraser(event);
+                }
+            }
+        });
+
+        $("#paint-bucket").click(function () {
+            ctx.fill();
+        });
+
+        $("#palette").click(function () {
+            color = prompt("Введіть css колір");
+            if (color) {
+                ctx.fillStyle = color;
+                ctx.strokeStyle = color;
+                $("#palette").css("background-color", color);
+            }
+        });
+
+        $("#strokes").click(function () {
+            if (brush.isSelected || draftingCompass.isSelected || ruler.isSelected || squareRuler.isSelected) {
+                strokes = prompt("Введіть товщину штриха");
+                ctx.lineWidth = strokes;
+            } else if (eraser.isSelected) {
+                widthEraser = prompt("Введіть товщину гумки");
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+
+
